@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Routes for 3x3 grid intersection (center = B1).
+  Vehicles flow through the center from all four approaches.
+-->
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- Default vehicle type -->
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5.0" maxSpeed="13.89"/>
+
+    <!-- Through center (B1): North-South and East-West -->
+    <route id="A1_B1_C1" edges="A0A1 A1B1 B1C1 C1C2"/>
+    <route id="C1_B1_A1" edges="C2C1 C1B1 B1A1 A1A0"/>
+    <route id="B0_B1_B2" edges="B0B1 B1B2"/>
+    <route id="B2_B1_B0" edges="B2B1 B1B0"/>
+    <route id="A1_B1_B2" edges="A0A1 A1B1 B1B2"/>
+    <route id="B2_B1_A1" edges="B2B1 B1A1 A1A0"/>
+    <route id="B0_B1_C1" edges="B0B1 B1C1 C1C2"/>
+    <route id="C1_B1_B0" edges="C2C1 C1B1 B1B0"/>
+
+    <!-- Flows: vehicles per hour from each direction through center -->
+    <flow id="flow_ns" type="car" route="B0_B1_B2" begin="0" end="3600" vehsPerHour="300"/>
+    <flow id="flow_sn" type="car" route="B2_B1_B0" begin="0" end="3600" vehsPerHour="300"/>
+    <flow id="flow_ew" type="car" route="A1_B1_C1" begin="0" end="3600" vehsPerHour="280"/>
+    <flow id="flow_we" type="car" route="C1_B1_A1" begin="0" end="3600" vehsPerHour="280"/>
+    <flow id="flow_ne" type="car" route="B0_B1_C1" begin="0" end="3600" vehsPerHour="120"/>
+    <flow id="flow_sw" type="car" route="C1_B1_B0" begin="0" end="3600" vehsPerHour="120"/>
+    <flow id="flow_nw" type="car" route="A1_B1_B2" begin="0" end="3600" vehsPerHour="100"/>
+    <flow id="flow_se" type="car" route="B2_B1_A1" begin="0" end="3600" vehsPerHour="100"/>
+</routes>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Traffic Light — Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Smart Traffic Light — Dashboard</h1>
+    <div class="phase-badge" id="phase-badge">Phase: —</div>
+    <div class="controls">
+      <label>Controller <select id="controller">
+        <option value="fixed">Fixed-time</option>
+        <option value="random">Random</option>
+        <option value="rl">RL (DQN)</option>
+      </select></label>
+      <label>Sim end (s) <input type="number" id="sim-end" value="120" min="30" max="3600" /></label>
+      <button id="btn-run">Start simulation</button>
+      <span id="status-text"></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="map-section">
+      <h2>Map</h2>
+      <div id="map"></div>
+      <p class="map-hint">SUMO network (B1 at center). Vehicles update when simulation runs.</p>
+    </section>
+
+    <section class="charts-section">
+      <h2>Metrics over time</h2>
+      <div class="charts">
+        <div class="chart-wrap">
+          <h3>Waiting time (s)</h3>
+          <canvas id="chart-waiting"></canvas>
+        </div>
+        <div class="chart-wrap">
+          <h3>Average speed (m/s)</h3>
+          <canvas id="chart-speed"></canvas>
+        </div>
+        <div class="chart-wrap">
+          <h3>Reward (≈ −waiting)</h3>
+          <canvas id="chart-reward"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

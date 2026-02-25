@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Plain XML nodes for 4-way intersection.
+  Center junction is a traffic light; others are dead ends for route boundaries.
+  Used by netconvert when netgenerate is not available (see generate_network.py).
+-->
+<nodes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/nodes_file.xsd">
+    <!-- Center: 4-way traffic-light junction -->
+    <node id="center" x="0" y="0" type="traffic_light"/>
+    <!-- Approach nodes (200 m from center) -->
+    <node id="north" x="0" y="200" type="dead_end"/>
+    <node id="south" x="0" y="-200" type="dead_end"/>
+    <node id="east" x="200" y="0" type="dead_end"/>
+    <node id="west" x="-200" y="0" type="dead_end"/>
+</nodes>

@@ -1,0 +1,10 @@
+# Smart Traffic Light Optimization — Python dependencies
+# Phase 4: Gymnasium env
+# Phase 5: Stable-Baselines3 DQN
+# Phase 6–7: KPI service, FastAPI backend
+
+gymnasium>=0.29.0
+numpy>=1.24.0
+stable-baselines3>=2.0.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0

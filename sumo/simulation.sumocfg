@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SUMO configuration for Phase 1: simple 4-way intersection simulation.
+  Run with: sumo-gui -c simulation.sumocfg
+  Or: sumo -c simulation.sumocfg (no GUI)
+-->
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file value="intersection.net.xml"/>
+        <route-files value="routes.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="3600"/>
+        <step-length value="1"/>
+    </time>
+    <report>
+        <no-step-log value="true"/>
+        <no-warnings value="false"/>
+    </report>
+</configuration>
