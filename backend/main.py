@@ -12,6 +12,7 @@ From project root: uvicorn backend.main:app --host 0.0.0.0 --port 8000
 from __future__ import annotations
 
 import threading
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,33 @@ _avg_speed: float = 0.0
 _current_collector: KPICollector | None = None
 _last_kpis: dict[str, Any] | None = None
 _vehicle_positions: list[dict[str, Any]] = []
+
+
+def _parse_network_shapes() -> list[list[list[float]]]:
+    """Parse SUMO net XML and return lane shapes for the map. Each shape is [[y,x], ...] for Leaflet CRS.Simple."""
+    net_path = PROJECT_ROOT / "sumo" / "intersection.net.xml"
+    if not net_path.exists():
+        return []
+    shapes: list[list[list[float]]] = []
+    tree = ET.parse(net_path)
+    root = tree.getroot()
+    for edge in root.findall("edge"):
+        if edge.get("function") == "internal":
+            continue
+        for lane in edge.findall("lane"):
+            shape_attr = lane.get("shape")
+            if not shape_attr:
+                continue
+            # SUMO shape is "x,y x,y ..." -> Leaflet [lat,lng] = [y,x]
+            points: list[list[float]] = []
+            for part in shape_attr.strip().split():
+                coords = part.split(",")
+                if len(coords) >= 2:
+                    x, y = float(coords[0]), float(coords[1])
+                    points.append([y, x])
+            if len(points) >= 2:
+                shapes.append(points)
+    return shapes
 
 
 def _on_step(
@@ -173,6 +201,13 @@ def post_run(body: RunRequest) -> dict:
     )
     thread.start()
     return {"status": "started", "controller": body.controller, "sim_end": body.sim_end}
+
+
+@app.get("/network", response_model=dict)
+def get_network() -> dict:
+    """Return SUMO network lane shapes for the dashboard map. Each shape is [[y,x], ...] for Leaflet CRS.Simple."""
+    shapes = _parse_network_shapes()
+    return {"shapes": shapes}
 
 
 @app.get("/")

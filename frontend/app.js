@@ -2,8 +2,10 @@
  * Phase 8 — Dashboard: Leaflet map, vehicle markers, Chart.js, phase display.
  * Polls backend for /state, /phases, /vehicles when simulation is running.
  */
-// Backend API (run: uvicorn backend.main:app --port 8000)
-const API_BASE = "http://127.0.0.1:8000";
+// Same-origin when served from backend; fallback when opened as file (file://)
+const API_BASE = (typeof window !== "undefined" && window.location.protocol === "file:")
+  ? "http://127.0.0.1:8000"
+  : "";
 
 // SUMO net bounds (from intersection.net.xml convBoundary 0,0,400,400)
 const MAP_BOUNDS = [[0, 0], [400, 400]];
@@ -11,6 +13,7 @@ const MAP_CENTER = [200, 200];
 
 let map = null;
 let vehicleMarkers = [];
+let networkLayers = [];
 let pollTimer = null;
 let chartWaiting = null;
 let chartSpeed = null;
@@ -34,6 +37,29 @@ function initMap() {
     fillOpacity: 0.05,
     weight: 1,
   }).addTo(map);
+}
+
+async function loadNetwork() {
+  if (!map) return;
+  try {
+    const res = await fetch(`${API_BASE}/network`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const shapes = data.shapes || [];
+    networkLayers.forEach((layer) => map.removeLayer(layer));
+    networkLayers = [];
+    const roadStyle = {
+      color: "#4a5568",
+      weight: 6,
+      opacity: 0.95,
+    };
+    shapes.forEach((shape) => {
+      const poly = L.polyline(shape, roadStyle).addTo(map);
+      networkLayers.push(poly);
+    });
+  } catch (_) {
+    // Network endpoint may be unavailable
+  }
 }
 
 function updateVehicleMarkers(vehicles) {
@@ -206,6 +232,7 @@ async function startSimulation() {
 
 function init() {
   initMap();
+  loadNetwork();
   initCharts();
   document.getElementById("btn-run").addEventListener("click", startSimulation);
   poll();
