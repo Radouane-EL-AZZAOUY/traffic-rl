@@ -6,9 +6,7 @@ Minimal DQN implementation from scratch using NumPy.
 This module provides:
 - Network: 2x64 fully connected ReLU network mapping state -> Q-values
 - ReplayBuffer: experience replay storage
-- DQNAgent: epsilon-greedy DQN with target network and SGD updates
-
-Intended to be used by rl/train_dqn.py when --impl scratch is selected.
+- DQNAgent: epsilon-greedy DQN with target network and Adam + gradient-clipping updates
 """
 
 from dataclasses import dataclass
@@ -22,11 +20,13 @@ class Network:
 
     def __init__(self, state_size: int, action_size: int, hidden_size: int = 64):
         rng = np.random.default_rng()
-        self.w1 = rng.normal(0, 0.1, size=(hidden_size, state_size))
+        # He (Kaiming) initialisation: std = sqrt(2 / fan_in). Correct for ReLU
+        # activations and far more stable than a fixed small std.
+        self.w1 = rng.normal(0, np.sqrt(2.0 / state_size),  size=(hidden_size, state_size))
         self.b1 = np.zeros((hidden_size,))
-        self.w2 = rng.normal(0, 0.1, size=(hidden_size, hidden_size))
+        self.w2 = rng.normal(0, np.sqrt(2.0 / hidden_size), size=(hidden_size, hidden_size))
         self.b2 = np.zeros((hidden_size,))
-        self.w3 = rng.normal(0, 0.1, size=(action_size, hidden_size))
+        self.w3 = rng.normal(0, np.sqrt(2.0 / hidden_size), size=(action_size, hidden_size))
         self.b3 = np.zeros((action_size,))
 
     def forward(self, x: np.ndarray) -> np.ndarray:
@@ -116,6 +116,12 @@ class DQNConfig:
     epsilon_start: float = 1.0
     epsilon_end: float = 0.05
     epsilon_decay_fraction: float = 0.2  # fraction of total timesteps over which to decay
+    # Adam optimizer hyperparameters (mirrors PyTorch / SB3 defaults)
+    adam_beta1: float = 0.9
+    adam_beta2: float = 0.999
+    adam_eps: float = 1e-8
+    # Gradient clipping: max L2 norm of all gradients combined (SB3 default = 10)
+    max_grad_norm: float = 10.0
 
 
 class DQNAgent:
@@ -127,6 +133,15 @@ class DQNAgent:
         self.replay_buffer = ReplayBuffer(config.buffer_size, config.state_size)
         self.total_timesteps = max(1, total_timesteps)
         self.timestep = 0
+
+        # Adam optimiser state — one first-moment (m) and second-moment (v)
+        # array per parameter, all initialised to zero.
+        _param_names = ("w1", "b1", "w2", "b2", "w3", "b3")
+        self._adam_m = {n: np.zeros_like(p)
+                        for n, p in zip(_param_names, self.policy_net.parameters())}
+        self._adam_v = {n: np.zeros_like(p)
+                        for n, p in zip(_param_names, self.policy_net.parameters())}
+        self._adam_t = 0  # step counter for bias correction
 
     def epsilon(self) -> float:
         """Linear epsilon decay from epsilon_start to epsilon_end."""
@@ -226,14 +241,41 @@ class DQNAgent:
         grad_w1 = grad_z1.T @ states  # (H, S)
         grad_b1 = np.sum(grad_z1, axis=0)
 
-        # SGD update
+        # --- Gradient clipping (L2 norm over all parameters combined) ---
+        # SB3 clips at max_grad_norm=10 by default; prevents exploding gradients.
+        raw_grads = [grad_w1, grad_b1, grad_w2, grad_b2, grad_w3, grad_b3]
+        total_norm = float(np.sqrt(sum(np.sum(g ** 2) for g in raw_grads)))
+        clip = self.cfg.max_grad_norm
+        if total_norm > clip:
+            scale = clip / (total_norm + 1e-6)
+            raw_grads = [g * scale for g in raw_grads]
+        grad_w1, grad_b1, grad_w2, grad_b2, grad_w3, grad_b3 = raw_grads
+
+        # --- Adam update ---
+        # Adam keeps a running average of gradients (m) and squared gradients (v).
+        # Bias correction (dividing by 1-β^t) removes the effect of initialising
+        # m and v at zero, which would otherwise make early updates too small.
+        self._adam_t += 1
+        t = self._adam_t
+        b1 = self.cfg.adam_beta1
+        b2 = self.cfg.adam_beta2
+        eps = self.cfg.adam_eps
         lr = self.cfg.lr
-        self.policy_net.w3 -= lr * grad_w3
-        self.policy_net.b3 -= lr * grad_b3
-        self.policy_net.w2 -= lr * grad_w2
-        self.policy_net.b2 -= lr * grad_b2
-        self.policy_net.w1 -= lr * grad_w1
-        self.policy_net.b1 -= lr * grad_b1
+
+        param_grad_pairs = [
+            ("w1", self.policy_net.w1, grad_w1),
+            ("b1", self.policy_net.b1, grad_b1),
+            ("w2", self.policy_net.w2, grad_w2),
+            ("b2", self.policy_net.b2, grad_b2),
+            ("w3", self.policy_net.w3, grad_w3),
+            ("b3", self.policy_net.b3, grad_b3),
+        ]
+        for name, param, grad in param_grad_pairs:
+            self._adam_m[name] = b1 * self._adam_m[name] + (1.0 - b1) * grad
+            self._adam_v[name] = b2 * self._adam_v[name] + (1.0 - b2) * grad ** 2
+            m_hat = self._adam_m[name] / (1.0 - b1 ** t)  # bias-corrected mean
+            v_hat = self._adam_v[name] / (1.0 - b2 ** t)  # bias-corrected variance
+            param -= lr * m_hat / (np.sqrt(v_hat) + eps)
 
         return loss
 

@@ -193,9 +193,20 @@ def run_simulation_and_collect_kpis(
         random.seed(seed)
 
     model = None
+    scratch_net = None
     if controller == "rl" and model_path:
         from stable_baselines3 import DQN
         model = DQN.load(str(model_path))
+    elif controller == "rl_scratch" and model_path:
+        from rl.from_scratch.dqn_numpy import Network as _ScratchNetwork
+        _data = np.load(str(model_path))
+        scratch_net = _ScratchNetwork(state_size=4, action_size=2, hidden_size=64)
+        scratch_net.w1 = _data["w1"]
+        scratch_net.b1 = _data["b1"]
+        scratch_net.w2 = _data["w2"]
+        scratch_net.b2 = _data["b2"]
+        scratch_net.w3 = _data["w3"]
+        scratch_net.b3 = _data["b3"]
 
     sumo_cmd = [
         sumo_bin,
@@ -218,15 +229,18 @@ def run_simulation_and_collect_kpis(
             # At start of each control block: optionally set phase (random/RL)
             phase_switched = False
             if controller != "fixed" and step >= next_control_at:
+                obs = np.array([
+                    traci.lane.getLastStepVehicleNumber(lane_id)
+                    for lane_id in B1_INCOMING_LANES
+                ], dtype=np.float32)
                 if controller == "random":
                     action = random.randint(0, 1)
-                else:  # rl
-                    obs = np.array([
-                        traci.lane.getLastStepVehicleNumber(lane_id)
-                        for lane_id in B1_INCOMING_LANES
-                    ], dtype=np.float32)
+                elif controller == "rl":
                     action, _ = model.predict(obs, deterministic=True)
                     action = int(action) % 2
+                else:  # rl_scratch
+                    q_vals = scratch_net.forward(obs.reshape(1, -1))[0]
+                    action = int(np.argmax(q_vals)) % 2
                 new_state = B1_PHASES[GREEN_PHASE_INDICES[action]]
                 phase_switched = new_state != current_phase
                 current_phase = new_state
@@ -302,11 +316,18 @@ if __name__ == "__main__":
     """Run a short fixed-time simulation and print KPIs as JSON."""
     import argparse
     p = argparse.ArgumentParser()
-    p.add_argument("--controller", choices=("fixed", "random", "rl"), default="fixed")
+    p.add_argument("--controller", choices=("fixed", "random", "rl", "rl_scratch"), default="fixed")
     p.add_argument("--sim-end", type=int, default=120)
     p.add_argument("--model", type=str, default=None)
     args = p.parse_args()
-    model_path = args.model or (str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light.zip") if args.controller == "rl" else None)
+    if args.model:
+        model_path = args.model
+    elif args.controller == "rl":
+        model_path = str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light.zip")
+    elif args.controller == "rl_scratch":
+        model_path = str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light_scratch.npz")
+    else:
+        model_path = None
     try:
         out = get_kpis_json(sim_end=args.sim_end, controller=args.controller, model_path=model_path)
         print(out)

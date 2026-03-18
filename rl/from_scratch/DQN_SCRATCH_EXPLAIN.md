@@ -13,7 +13,7 @@ The goal is to closely mirror **Stable-Baselines3 DQN** while remaining small an
 
 ### High-level data flow
 
-Training loop (in `train_dqn.py --impl scratch`):
+Training loop (in `from_scratch/train_dqn_scratch.py`):
 
 ```text
 SUMO (TraCI)  →  SumoEnv  →  state (4 floats)
@@ -34,10 +34,10 @@ SUMO (TraCI)  →  SumoEnv  →  state (4 floats)
                            target_net sync)
 ```
 
-At eval time (in `evaluate_from_scratch.py`):
+At eval time (in `from_scratch/evaluate_scratch.py`):
 
 ```text
-Load .npz → build Network → SumoEnv loop → greedy argmax(Q(s))
+Load .npz → build Network → TraCI loop → greedy argmax(Q(s))
 ```
 
 ---

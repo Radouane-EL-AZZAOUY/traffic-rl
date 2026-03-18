@@ -109,11 +109,19 @@ def _on_step(
 def _run_simulation(controller: str, sim_end: int, control_interval: int, model_path: str | None, seed: int | None) -> None:
     global _running, _last_kpis
     try:
+        _default_model: str | None = None
+        if model_path:
+            _default_model = model_path
+        elif controller == "rl":
+            _default_model = str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light.zip")
+        elif controller == "rl_scratch":
+            _default_model = str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light_scratch.npz")
+
         results = run_simulation_and_collect_kpis(
             sim_end=sim_end,
             control_interval=control_interval,
             controller=controller,
-            model_path=model_path or (str(PROJECT_ROOT / "rl" / "models" / "dqn_traffic_light.zip") if controller == "rl" else None),
+            model_path=_default_model,
             seed=seed,
             on_step=_on_step,
         )
@@ -128,10 +136,10 @@ def _run_simulation(controller: str, sim_end: int, control_interval: int, model_
 
 
 class RunRequest(BaseModel):
-    controller: str = Field(default="fixed", description="fixed | random | rl")
+    controller: str = Field(default="fixed", description="fixed | random | rl | rl_scratch")
     sim_end: int = Field(default=360, ge=1, le=7200, description="Simulation end time (s)")
     control_interval: int = Field(default=5, ge=1, le=60)
-    model_path: str | None = Field(default=None, description="Path to DQN model when controller=rl")
+    model_path: str | None = Field(default=None, description="Path to model (.zip for rl, .npz for rl_scratch)")
     seed: int | None = Field(default=42)
 
 
