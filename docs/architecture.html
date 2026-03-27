@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic RL Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --panel: #111827;
+    --border: #1e2d4a;
+    --accent1: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --card: #151f2e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 32px 48px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 30px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 24px 48px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 10px 24px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all 0.2s;
+    color: var(--muted);
+    background: transparent;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    background: var(--panel);
+    border-color: var(--border);
+    color: var(--accent1);
+  }
+
+  .panel { display: none; padding: 40px 48px; }
+  .panel.active { display: block; }
+
+  /* ---- GLOBAL ---- */
+  .global-grid {
+    display: grid;
+    grid-template-columns: 1fr 72px 1fr 72px 1fr;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 48px;
+  }
+
+  .node {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 20px;
+    text-align: center;
+  }
+  .node.agent { border-color: #7c3aed; box-shadow: 0 0 30px rgba(124,58,237,0.12); }
+  .node.env   { border-color: #00d4ff; box-shadow: 0 0 30px rgba(0,212,255,0.12); }
+  .node.sumo  { border-color: #10b981; box-shadow: 0 0 30px rgba(16,185,129,0.12); }
+
+  .node-icon { font-size: 36px; margin-bottom: 10px; display: block; }
+  .node-title { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+  .node.agent .node-title { color: #7c3aed; }
+  .node.env   .node-title { color: #00d4ff; }
+  .node.sumo  .node-title { color: #10b981; }
+  .node-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  .arrow-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .arrow-label { font-size: 10px; font-family: 'Space Mono', monospace; text-align: center; white-space: nowrap; }
+
+  .flow-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .flow-steps {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+
+  .step {
+    padding: 20px 16px;
+    border-right: 1px solid var(--border);
+  }
+  .step:last-child { border-right: none; }
+
+  .step-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--border);
+    margin-bottom: 10px;
+    display: block;
+  }
+  .step-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .step-desc  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .step.s1 { border-top: 3px solid #7c3aed; }
+  .step.s2 { border-top: 3px solid #00d4ff; }
+  .step.s3 { border-top: 3px solid #10b981; }
+  .step.s4 { border-top: 3px solid #f59e0b; }
+  .step.s5 { border-top: 3px solid #7c3aed; }
+  .step.s6 { border-top: 3px solid #00d4ff; }
+
+  /* ---- DETAIL ---- */
+  .detail-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .detail-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .detail-box-header {
+    padding: 13px 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .box-agent .detail-box-header { background: rgba(124,58,237,0.15); color: #7c3aed; border-bottom: 1px solid rgba(124,58,237,0.3); }
+  .box-env   .detail-box-header { background: rgba(0,212,255,0.08);  color: #00d4ff; border-bottom: 1px solid rgba(0,212,255,0.2);  }
+  .box-sumo  .detail-box-header { background: rgba(16,185,129,0.08); color: #10b981; border-bottom: 1px solid rgba(16,185,129,0.2); }
+
+  .fn-list { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .fn-item {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .fn-item:hover { border-left-color: var(--accent4); }
+  .fn-name { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--accent4); margin-bottom: 3px; }
+  .fn-desc  { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .dataflow {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .dataflow-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent1);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .df-row { display: flex; align-items: center; gap: 0; margin-bottom: 14px; }
+  .df-row:last-child { margin-bottom: 0; }
+
+  .df-pill {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .df-pill.agent { background: rgba(124,58,237,0.2); color: #7c3aed; border: 1px solid rgba(124,58,237,0.4); }
+  .df-pill.env   { background: rgba(0,212,255,0.1);  color: #00d4ff; border: 1px solid rgba(0,212,255,0.3);  }
+  .df-pill.sumo  { background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  .df-pill.buf   { background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+
+  .df-seg {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 6px;
+    min-width: 50px;
+  }
+  .df-line {
+    width: 100%;
+    height: 2px;
+    border-radius: 1px;
+    position: relative;
+  }
+  .df-line.fwd { background: linear-gradient(90deg, rgba(0,212,255,0.2), #00d4ff); }
+  .df-line.bwd { background: linear-gradient(90deg, #7c3aed, rgba(124,58,237,0.2)); }
+  .df-line.fwd::after  { content:''; position:absolute; right:-1px; top:50%; transform:translateY(-50%); border:5px solid transparent; border-left-color:#00d4ff; }
+  .df-line.bwd::before { content:''; position:absolute; left:-1px;  top:50%; transform:translateY(-50%); border:5px solid transparent; border-right-color:#7c3aed; }
+  .df-lbl { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 4px; white-space: nowrap; }
+
+  .nn-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .nn-arrow { color: var(--border); font-size: 20px; flex-shrink: 0; }
+
+  /* ---- GLOSSARY ---- */
+  .glossary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .gloss-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .gloss-term {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gloss-tag {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .tag-rl   { background: rgba(124,58,237,0.2); color: #7c3aed; }
+  .tag-env  { background: rgba(0,212,255,0.1);  color: #00d4ff; }
+  .tag-sumo { background: rgba(16,185,129,0.1); color: #10b981; }
+  .tag-nn   { background: rgba(245,158,11,0.1); color: #f59e0b; }
+  .gloss-def { font-size: 12px; color: var(--muted); line-height: 1.55; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Traffic-RL / rl/</div>
+  <h1>Agent + SUMO Architecture</h1>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('global', this)">1 · Global Architecture</div>
+  <div class="tab"        onclick="switchTab('detail', this)">2 · Detail Architecture</div>
+  <div class="tab"        onclick="switchTab('glossary', this)">3 · Glossary</div>
+</div>
+
+<!-- ======== GLOBAL ======== -->
+<div id="tab-global" class="panel active">
+
+  <p class="flow-title">The 3 Players</p>
+
+  <div class="global-grid">
+    <div class="node agent">
+      <span class="node-icon">🤖</span>
+      <div class="node-title">DQN Agent</div>
+      <div class="node-sub">A neural network that learns to pick the best traffic light phase. Gets smarter over time.</div>
+    </div>
+
+    <div class="arrow-col">
+      <div class="arrow-label" style="color:#00d4ff;">→ action</div>
+      <svg width="64" height="32" viewBox="0 0 64 32">
+        <defs>
+          <marker id="a1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="#00d4ff" stroke-width="1.5"/>
+          </marker>
+          <marker id="a2" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
+            <path d="M6,0 L0,3 L6,6" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+          </marker>
+        </defs>
+        <line x1="4" y1="10" x2="60" y2="10" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#a1)"/>
+        <line x1="60" y1="22" x2="4" y2="22" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#a2)"/>
+      </svg>
+      <div class="arrow-label" style="color:#7c3aed;">← obs + reward</div>
+    </div>
+
+    <div class="node env">
+      <span class="node-icon">🌐</span>
+      <div class="node-title">SumoEnv</div>
+      <div class="node-sub">The translator. Converts agent decisions into SUMO commands and SUMO data into numbers the agent understands.</div>
+    </div>
+
+    <div class="arrow-col">
+      <div class="arrow-label" style="color:#10b981;">→ TraCI command</div>
+      <svg width="64" height="32" viewBox="0 0 64 32">
+        <defs>
+          <marker id="a3" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6" fill="none" stroke="#10b981" stroke-width="1.5"/>
+          </marker>
+          <marker id="a4" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
+            <path d="M6,0 L0,3 L6,6" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+          </marker>
+        </defs>
+        <line x1="4" y1="10" x2="60" y2="10" stroke="#10b981" stroke-width="1.5" marker-end="url(#a3)"/>
+        <line x1="60" y1="22" x2="4" y2="22" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#a4)"/>
+      </svg>
+      <div class="arrow-label" style="color:#f59e0b;">← sim data</div>
+    </div>
+
+    <div class="node sumo">
+      <span class="node-icon">🚦</span>
+      <div class="node-title">SUMO Simulator</div>
+      <div class="node-sub">Runs real traffic. Vehicles move, stop, and accumulate waiting time. Reports counts and delays.</div>
+    </div>
+  </div>
+
+  <p class="flow-title">One Training Cycle — 6 Steps</p>
+
+  <div class="flow-steps">
+    <div class="step s1">
+      <span class="step-num">01</span>
+      <div class="step-title">Observe</div>
+      <div class="step-desc">Read vehicle counts on the 4 incoming lanes of intersection B1. This is the state (shape 4,).</div>
+    </div>
+    <div class="step s2">
+      <span class="step-num">02</span>
+      <div class="step-title">Decide</div>
+      <div class="step-desc">Agent picks action 0 (N-S green) or 1 (E-W green). Early on: random. Later: uses neural net.</div>
+    </div>
+    <div class="step s3">
+      <span class="step-num">03</span>
+      <div class="step-title">Act</div>
+      <div class="step-desc">SumoEnv sends the chosen phase string to SUMO via TraCI (e.g. "GGggrrrr…").</div>
+    </div>
+    <div class="step s4">
+      <span class="step-num">04</span>
+      <div class="step-title">Simulate</div>
+      <div class="step-desc">SUMO runs 5 seconds of traffic with that phase. Vehicles move, some stop and wait.</div>
+    </div>
+    <div class="step s5">
+      <span class="step-num">05</span>
+      <div class="step-title">Reward</div>
+      <div class="step-desc">Reward = −(total waiting time). Less waiting = higher reward. Agent wants to maximize this.</div>
+    </div>
+    <div class="step s6">
+      <span class="step-num">06</span>
+      <div class="step-title">Learn</div>
+      <div class="step-desc">Experience stored in buffer. Agent samples 32 past experiences, runs backprop, updates weights.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ======== DETAIL ======== -->
+<div id="tab-detail" class="panel">
+
+  <div class="dataflow">
+    <div class="dataflow-title">Data Flow — One Step</div>
+    <div class="df-row">
+      <div class="df-pill agent">DQNAgent<br>.act(state)</div>
+      <div class="df-seg">
+        <div class="df-line fwd"></div>
+        <div class="df-lbl">action ∈ {0,1}</div>
+      </div>
+      <div class="df-pill env">SumoEnv<br>.step(action)</div>
+      <div class="df-seg">
+        <div class="df-line fwd"></div>
+        <div class="df-lbl">setPhase → simulationStep ×5</div>
+      </div>
+      <div class="df-pill sumo">SUMO<br>(TraCI)</div>
+    </div>
+    <div class="df-row" style="flex-direction:row-reverse;">
+      <div class="df-pill agent">store_transition()<br>→ train_step()</div>
+      <div class="df-seg">
+        <div class="df-line bwd"></div>
+        <div class="df-lbl">obs, reward, done, info</div>
+      </div>
+      <div class="df-pill env">lane_counts<br>waiting_time</div>
+      <div class="df-seg">
+        <div class="df-line bwd"></div>
+        <div class="df-lbl">getLastStepVehicleNumber()</div>
+      </div>
+      <div class="df-pill sumo">SUMO<br>state</div>
+    </div>
+  </div>
+
+  <div class="detail-container">
+
+    <div class="detail-box box-agent">
+      <div class="detail-box-header">🤖 DQNAgent <span style="font-size:9px;opacity:.6;">(dqn_numpy.py)</span></div>
+      <div class="fn-list">
+        <div class="fn-item">
+          <div class="fn-name">act(state)</div>
+          <div class="fn-desc">Picks an action. Uses epsilon: if random number &lt; ε → random action (explore), else → pick highest Q-value (exploit).</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">store_transition(s, a, r, s', done)</div>
+          <div class="fn-desc">Saves one experience to the Replay Buffer. Buffer holds the last 10,000 experiences.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">train_step()</div>
+          <div class="fn-desc">Samples 32 random experiences → computes TD error → backpropagates → updates weights via Adam.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">maybe_update_target()</div>
+          <div class="fn-desc">Every 500 steps, copies policy_net → target_net. Keeps training stable.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">epsilon()</div>
+          <div class="fn-desc">Returns exploration rate. Starts at 1.0 (fully random), linearly decays to 0.05 over 20% of training.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-box box-env">
+      <div class="detail-box-header">🌐 SumoEnv <span style="font-size:9px;opacity:.6;">(sumo_env.py)</span></div>
+      <div class="fn-list">
+        <div class="fn-item">
+          <div class="fn-name">reset()</div>
+          <div class="fn-desc">Starts a fresh SUMO simulation. Returns the initial observation (vehicle counts on 4 lanes).</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">step(action)</div>
+          <div class="fn-desc">Sets the traffic light phase, runs 5 sim-seconds, returns (observation, reward, terminated, truncated, info).</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">_get_obs()</div>
+          <div class="fn-desc">Calls SUMO to count vehicles on each of the 4 lanes entering B1. Returns array shape (4,).</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">_set_phase(action)</div>
+          <div class="fn-desc">Translates 0 → "GGggrrrr…" (N-S green) or 1 → "rrrrGGgg…" (E-W green) and sends to TraCI.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">close()</div>
+          <div class="fn-desc">Disconnects TraCI and shuts down SUMO process.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-box box-sumo">
+      <div class="detail-box-header">🚦 SUMO + TraCI <span style="font-size:9px;opacity:.6;">(sumo_utils.py)</span></div>
+      <div class="fn-list">
+        <div class="fn-item">
+          <div class="fn-name">traci.start(cmd)</div>
+          <div class="fn-desc">Launches SUMO as a subprocess and opens a TCP socket so Python can control it live.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">trafficlight.setRedYellowGreenState()</div>
+          <div class="fn-desc">Instantly applies a phase string (e.g. "GGggrrrr…") to intersection B1.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">simulationStep()</div>
+          <div class="fn-desc">Advances simulation by 1 second. Called 5 times per agent step (control_interval = 5).</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">lane.getLastStepVehicleNumber()</div>
+          <div class="fn-desc">Returns vehicle count on a lane in the last second. Used to build the observation array.</div>
+        </div>
+        <div class="fn-item">
+          <div class="fn-name">vehicle.getWaitingTime()</div>
+          <div class="fn-desc">How long a vehicle has been stopped. Summed over all vehicles → used as reward signal.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dataflow">
+    <div class="dataflow-title">Neural Network Inside DQNAgent</div>
+    <div class="nn-row">
+      <div class="df-pill env" style="font-size:12px;">Input (4,)<br><span style='font-weight:300;font-size:10px;color:#64748b;'>lane vehicle counts</span></div>
+      <div class="nn-arrow">→</div>
+      <div class="df-pill buf" style="font-size:12px;">Dense 64 · ReLU<br><span style='font-weight:300;font-size:10px;color:#64748b;'>Hidden layer 1</span></div>
+      <div class="nn-arrow">→</div>
+      <div class="df-pill buf" style="font-size:12px;">Dense 64 · ReLU<br><span style='font-weight:300;font-size:10px;color:#64748b;'>Hidden layer 2</span></div>
+      <div class="nn-arrow">→</div>
+      <div class="df-pill agent" style="font-size:12px;">Q-values (2,)<br><span style='font-weight:300;font-size:10px;color:#64748b;'>score for each action</span></div>
+      <div class="nn-arrow">→</div>
+      <div class="df-pill sumo" style="font-size:12px;">argmax → action<br><span style='font-weight:300;font-size:10px;color:#64748b;'>pick best action</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ======== GLOSSARY ======== -->
+<div id="tab-glossary" class="panel">
+  <div class="glossary-grid">
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#7c3aed;">DQN <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">Deep Q-Network. A neural network trained to predict the "value" of each possible action. The agent always picks the action with the highest predicted value.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#00d4ff;">SumoEnv <span class="gloss-tag tag-env">ENV</span></div>
+      <div class="gloss-def">A Python class wrapping SUMO as a Gymnasium environment. It gives the agent a clean interface: observe → act → get reward — hiding all SUMO complexity.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#10b981;">SUMO <span class="gloss-tag tag-sumo">SIMULATOR</span></div>
+      <div class="gloss-def">"Simulation of Urban MObility". Open-source software that simulates cars on a virtual road network with real physics (speed, acceleration, stopping).</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#10b981;">TraCI <span class="gloss-tag tag-sumo">SUMO</span></div>
+      <div class="gloss-def">"Traffic Control Interface". The Python API to talk to SUMO in real time — read vehicle positions, set traffic lights, advance the clock.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Observation <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">What the agent "sees" at each step. Here: 4 numbers — vehicle count on each incoming lane at intersection B1.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Action <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">What the agent decides. Two choices: 0 = give green to North-South traffic, 1 = give green to East-West traffic.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Reward <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">Score given after each action. Reward = −(sum of all vehicles' waiting time). Minimizing waiting time = maximizing reward.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Replay Buffer <span class="gloss-tag tag-nn">NN</span></div>
+      <div class="gloss-def">Memory storing up to 10,000 past experiences. Agent randomly samples from it during training so it doesn't forget old lessons.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Policy Net <span class="gloss-tag tag-nn">NN</span></div>
+      <div class="gloss-def">The neural network being actively trained. It decides what action to take. Updated every 4 steps.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Target Net <span class="gloss-tag tag-nn">NN</span></div>
+      <div class="gloss-def">A frozen copy of the policy net used only to compute training targets. Synced with policy net every 500 steps. Prevents unstable feedback loops.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#7c3aed;">Epsilon (ε) <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">Exploration rate. ε = 1.0 → fully random (agent explores freely). ε = 0.05 → mostly uses neural net (agent exploits knowledge). Decays linearly during training.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#00d4ff;">Intersection B1 <span class="gloss-tag tag-sumo">SUMO</span></div>
+      <div class="gloss-def">The center intersection in the road grid. Has 4 incoming lanes (N, S, E, W). The only traffic light the agent controls.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#7c3aed;">Episode <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">One full simulation run (360 simulated seconds = 72 agent steps). When it ends, SUMO resets and a new episode starts from scratch.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">Adam Optimizer <span class="gloss-tag tag-nn">NN</span></div>
+      <div class="gloss-def">Algorithm that updates the neural network weights. It adapts the learning rate per parameter based on past gradients — faster and more stable than plain gradient descent.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#f59e0b;">TD Error <span class="gloss-tag tag-nn">NN</span></div>
+      <div class="gloss-def">"Temporal Difference Error". The gap between what the agent predicted and what it should have predicted. The loss function minimizes this gap.</div>
+    </div>
+
+    <div class="gloss-item">
+      <div class="gloss-term" style="color:#7c3aed;">Gamma (γ = 0.99) <span class="gloss-tag tag-rl">RL</span></div>
+      <div class="gloss-def">Discount factor. Future rewards are worth 99% as much as immediate ones. High γ = agent cares about long-term consequences, not just right now.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function switchTab(name, el) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>

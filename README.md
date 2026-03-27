@@ -4,7 +4,7 @@ A Smart Traffic Light Optimization project using **SUMO**, **Reinforcement Learn
 
 Pipeline: **OSM → SUMO → TraCI → RL Agent → Traffic Light Control → KPIs → FastAPI → Leaflet + Charts**
 
-📖 **Detailed guide:** [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) — algorithms, DQN training, visual workflows, analogies, customization examples, and how to test and interpret results.
+📖 **Full documentation (architecture, SB3 & scratch DQN, math, workflows):** [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) — with [visual Mermaid diagrams in HTML](docs/PROJECT_DOCUMENTATION_VISUALS.html).
 
 ---
 

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Traffic-RL — Architecture &amp; DQN workflows</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      themeVariables: {
+        primaryColor: "#1e3a5f",
+        primaryTextColor: "#e8eef5",
+        primaryBorderColor: "#4a90d9",
+        lineColor: "#7eb8da",
+        secondaryColor: "#2d4a3e",
+        tertiaryColor: "#3d2d4a"
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --text: #e4eaf0;
+      --muted: #8a9ba8;
+      --accent: #5eb3f6;
+      --border: #2a3542;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    header {
+      padding: 2.5rem 1.5rem 2rem;
+      background: linear-gradient(145deg, #152028 0%, var(--bg) 55%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      margin: 0;
+      max-width: 52rem;
+      color: var(--muted);
+    }
+    header a { color: var(--accent); }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    section {
+      margin-bottom: 3rem;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0 0 1rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .diagram {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      overflow-x: auto;
+    }
+    .diagram .mermaid { text-align: center; }
+    .ascii {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      background: #121820;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      color: #c5d4e0;
+    }
+    .note {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Traffic-RL — visual workflows</h1>
+    <p>
+      Companion to <a href="./PROJECT_DOCUMENTATION.md">PROJECT_DOCUMENTATION.md</a>.
+      Diagrams use <strong>Mermaid</strong> (requires network for the CDN). For formulas and full text, read the markdown guide.
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>Global pipeline</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  subgraph DataPrep["Data / map"]
+    OSM[OSM optional]
+    NET[SUMO net.xml]
+    ROUTES[routes / flows]
+  end
+  subgraph Sim["Simulation"]
+    SUMO[SUMO engine]
+    TraCI[TraCI API]
+  end
+  subgraph RL["Reinforcement learning"]
+    ENV[SumoEnv Gymnasium]
+    AGENT[DQN SB3 or NumPy]
+  end
+  subgraph App["Application"]
+    API[FastAPI]
+    UI[Leaflet + charts]
+  end
+  OSM --> NET
+  NET --> SUMO
+  ROUTES --> SUMO
+  SUMO <--> TraCI
+  TraCI <--> ENV
+  ENV <--> AGENT
+  TraCI --> API
+  API --> UI
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Training process</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph Process["Python process"]
+    TRAIN[train_dqn.py]
+    ENV[SumoEnv]
+    SB3[Stable-Baselines3 DQN]
+    NP[DQNAgent NumPy]
+  end
+  SUMO_BIN[sumo / sumo-gui]
+  TRAIN --> ENV
+  TRAIN --> SB3
+  TRAIN --> NP
+  ENV -->|traci.start| SUMO_BIN
+  ENV -->|observation / reward| TRAIN
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Environment step (TraCI)</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+sequenceDiagram
+  participant A as Agent
+  participant E as SumoEnv
+  participant T as TraCI
+  participant S as SUMO
+  A->>E: step(action)
+  E->>T: setRedYellowGreenState(B1, phase)
+  loop control_interval micro-steps
+    E->>T: simulationStep()
+    T->>S: advance
+  end
+  T->>E: lane counts, waiting time
+  E->>A: obs, reward, done, info
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>From-scratch training loop</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  START([Start]) --> RESET[env.reset]
+  RESET --> ACT[agent.act: ε-greedy]
+  ACT --> STEP[env.step]
+  STEP --> STORE[store_transition]
+  STORE --> TRAIN[train_step if schedule allows]
+  TRAIN --> TARGET{timestep % target_interval == 0?}
+  TARGET -->|yes| COPY[target_net ← policy_net]
+  TARGET -->|no| DONECHK
+  COPY --> DONECHK{terminated or truncated?}
+  DONECHK -->|yes| RESET
+  DONECHK -->|no| ACT
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Q-network (4 → 64 → 64 → 2)</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  S["State s\n(4 lane counts)"]
+  L1["Linear + ReLU\n64"]
+  L2["Linear + ReLU\n64"]
+  OUT["Linear\n2 Q-values"]
+  S --> L1 --> L2 --> OUT
+  OUT --> Q0["Q(s, NS)"]
+  OUT --> Q1["Q(s, EW)"]
+        </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>One DQN gradient step</h2>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  B[Sample minibatch] --> F1[Forward policy_net: Q_theta]
+  B --> F2[Forward target_net: Q_theta-]
+  F1 --> PICK[Select Q for taken actions a]
+  F2 --> MAX[max over actions on s']
+  PICK --> LOSS[MSE vs y = r + gamma * max * 1-done]
+  MAX --> LOSS
+  LOSS --> BP[Backprop to gradients]
+  BP --> CLIP[Global L2 clip]
+  CLIP --> ADAM[Adam update theta]
+        </pre>
+      </div>
+      <p class="note">After Adam, the target network is updated on a slower clock (every N environment steps), not every gradient step.</p>
+    </section>
+
+    <section>
+      <h2>ASCII: TD target (scalar per transition)</h2>
+      <pre class="ascii">
+    s ──► Q_θ(s,·) ──► pick index a ──► Q_θ(s,a)
+                                              │
+                                              │  compare
+                                              ▼
+    r + γ·(1-done)·max_a' Q_θ⁻(s',a')  ════════╪══►  MSE loss
+                                              │
+    s' ──► Q_θ⁻(s',·) ──► max over a' ────────┘
+
+    θ⁻ ← copy(θ)  every `target_update_interval` steps (hard update, τ=1 in SB3)
+      </pre>
+    </section>
+
+    <section>
+      <h2>ASCII: He init vs Adam (intuition)</h2>
+      <pre class="ascii">
+  He init (ReLU layer, fan_in = n):
+       W ~ Normal(0, σ²),  σ = √(2/n)
+       keeps variance stable through ReLU blocks at start
+
+  Adam (per weight):
+       m ← β₁·m + (1-β₁)·g        ← momentum of gradients
+       v ← β₂·v + (1-β₂)·g²       ← running avg of squared grads
+       θ ← θ - α · m̂ / (√v̂ + ε)  ← adaptive step (bias-corrected m̂, v̂)
+      </pre>
+    </section>
+  </main>
+</body>
+</html>

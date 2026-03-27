@@ -1,6 +1,6 @@
 """
 Phase 4: Gymnasium environment for SUMO traffic light control.
-total
+
 SumoEnv wraps the SUMO simulation (TraCI) and exposes:
 - observation_space: lane vehicle counts (4 lanes) at B1
 - action_space: Discrete(2) — 0 = NS green, 1 = EW green
@@ -49,7 +49,7 @@ def _get_total_waiting_time() -> float:
     total = 0.0
     for veh_id in traci.vehicle.getIDList():
         total += traci.vehicle.getWaitingTime(veh_id)
-    return 
+    return total
 
 
 def _get_queue_length() -> int:
